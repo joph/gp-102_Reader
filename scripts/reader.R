@@ -10,19 +10,32 @@ infile <- "pois/"
 filelist <- setdiff(list.files(infile,full.names=T),
                     list.dirs(infile,recursive=F))
 
-file <- filelist[1] %>% 
-        readLines %>% 
-        tibble() %>% 
-        rename(line = 1) %>% 
-        mutate(date=substr(line,12,12+9)) %>% 
-        mutate(latitude=parseCoord(line,76)) %>% 
-        mutate(longitude=parseCoord(line,80))
-  
+fin_tibble<-NULL
 
+for(filename in filelist){
 
-parseCoord <- function(str,pos){
-  str_out = substr(str,pos,pos+4) %>% rawToChar()
+  file<-readBin(filename,
+           "integer",
+           size=4,
+           signed = 2,
+           n=200,
+           endian="little")
+
+  latitude<-file[20]/100000
+  longitude<-file[21]/100000
   
-  return(paste0(substr(str_out, 1, 3),'.',substr(str_out, 2)))
+  str<-read.table(filename,skipNul = T)[1,1] %>% 
+    substr(3,12) %>% 
+    gsub("]","",.) %>% 
+    gsub("\u0001","",.)
+  
+  t<-tibble(datetime=c(str),longitude=c(longitude),latitude=c(latitude))
+  fin_tibble<-bind_rows(fin_tibble,t)  
 }
+
+fin_tibble %>% filter(longitude>0 & latitude>0) %>% 
+  write.csv("results/points_csv.csv")
+
+fin_tibble %>% filter(longitude>0 & latitude>0) %>% 
+  write.csv2("results/points_csv2.csv")
 
